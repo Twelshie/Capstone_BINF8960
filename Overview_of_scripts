@@ -179,6 +179,7 @@ Here is the link to the Github repo (note that this is ssh):git@github.com:Twels
 library(ggplot2)
 library(readr)
 library(plyr)
+library(tinytex)
 ## Line graph
 summary_data= read.csv("summary_table_stats.csv")
 ggplot(summary_data) +
@@ -189,6 +190,8 @@ ggplot(summary_data) +
 variant_data= read.csv("variant_stats.csv")
   ggplot(variant_data, aes(x=sample, y=variant_reads, color= sample)) + 
   geom_bar(stat = "identity")
+rmarkdown::render("Capstone_binf_markdown.Rmd", output_format = "pdf_document")
+
 ```
 The above graphs display the number of reads for each sample at each step of raw, trimmed, and aligned in the form of a connected line graph, as well as a bar graph for the variants of each sample. One thing to note is that the variants data seemed inconsistant with what was in the output files from the variant processing command.
 We can see that the number of reads trends as having the most reads for alignment, then raw_reads, then the least number of reads for trimmed_reads. This is sensical because the trimmed reads will having a shorter sequence than the raw reads.
