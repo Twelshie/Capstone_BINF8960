@@ -1,0 +1,196 @@
+# Capstone BINF 8960 codes
+# Note that original scripts and data may be found in the /work/binf8960/tbw85611 directory on the teaching cluster
+
+
+First, set up files
+#Make subdirectories
+mkdir data docs results
+#Copy over data
+cp -r /work/binf8960/instructor_data/raw_fastq ./data/
+#Make raw data read only (as a backup)
+chmod -r data/raw_fastq/*.fastq*
+
+
+
+Now, run qc analyses on the seq reads
+#Run FASTQC on raw reads
+#module load FastQC/0.11.9-Java-11
+#mkdir data/fastqc_raw_results
+#fastqc -o data/fastqc_raw_results data/raw_fastq/*.fastq.gz
+#Run MultiQC to compile FastQC results
+#module load MultiQC/1.14-foss-2022a
+#multiqc -o data/fastqc_raw_results data/fastqc_raw_results
+#Trim raw reads with trimmomatic
+#module load Trimmomatic/0.39-Java-13
+#TRIMMOMATIC="java -jar /apps/eb/Trimmomatic/0.39-Java-13/trimmomatic-0.39.jar"
+#for fwd in data/raw_fastq/*_1.fastq.gz
+#do
+#       sample=$(basename $fwd _1.fastq.gz)
+#       $TRIMMOMATIC PE data/raw_fastq/${sample}_1.fastq.gz data/raw_fastq/${sample}$#data/trimmed_fastq_capstone/${sample}_1.paired.fastq.gz data/trimmed_fastq_capstone$#data/trimmed_fastq_capstone/${sample}_2.paired.fastq.gz data/trimmed_fastq_capstone$#ILLUMINACLIP:data/raw_fastq/NexteraPE-PE.fa:2:30:10:5:True SLIDINGWINDOW:4:20
+#done
+# trim script: $TRIMMOMATIC PE data/raw_fastq/SRR2584863_1.fastq.gz data/raw_fastq/S$
+#Run FASTQC on trimmed reads
+#module load FastQC/0.11.9-Java-11
+#mkdir data/fastqc_trimmed_results
+#fastqc -o data/fastqc_trimmed_results data/trimmed_fastq_capstone/*.fastq.gz
+#for file in trimmed_fastq_capstone*.fastq.gz
+#do zcat "$file" | wc -1
+#   result=$(zcat "file" | wc -1)
+#    echo "Reads in $file: $((result / 4))"
+#done
+#Run MultiQC to compile FastQC results
+#module load MultiQC/1.14-foss-2022a
+#multiqc -o data/fastqc_trimmed_results data/fastqc_trimmed_results
+
+
+
+Now, do variant calling
+#if error, stops and exits code
+set -e
+#REquired software
+module load BWA/0.7.18-GCCcore-13.3.0
+module load SAMtools/1.18-GCC-12.3.0
+module load BCFtools/1.18-GCC-12.3.0
+#new folders
+#mkdir data/genomes
+#mkdir results/sam
+#mkdir results/bam
+#mkdir results/vcf
+#mkdir results/bcf
+#Download E. coli genome
+#genome_url="ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/017/985/GCA_000017985.1_ASM1798v1/GCA_000017985.1_ASM1798v1_genomic.fna.gz"
+#wget -O data/genomes/ecoli_rel606.fna.gz $genome_url
+#gunzip data/genomes/ecoli_rel606.fna.gz
+#Index genome
+#bwa index data/genomes/ecoli_rel606.fna
+#Loop over reads and do alignment and variant calling
+for fwd in data/trimmed_fastq_capstone/*_1.paired.fastq.gz
+do
+        sample=$(basename $fwd _1.paired.fastq.gz)
+#Align reads to genome
+        echo "Aligning $sample"
+#       rev=data/trimmed_fastq_capstone/${sample}_2.paired.fastq.gz
+#       bwa mem data/genomes/ecoli_rel606.fna $fwd $rev > results/sam/$sample.sam
+#Convert to bam and sort
+#samtools view -S -b results/sam/${sample}.sam > results/bam/${sample}.bam
+#samtools sort -o results/bam/$sample.sorted.bam results/bam/$sample.bam
+#samtools view -F 0x4
+#Do variant calling
+echo "Calling variants in $sample"
+#bcftools mpileup -O b -o results/bcf/$sample.bcf -f data/genomes/ecoli_rel606.fna results/bam/$sample.sorted.bam
+#bcftools call --ploidy 1 -m -v -o results/vcf/$sample.vcf results/bcf/$sample.bcf
+aligned_reads=$(samtools view -q 1 "$output_bam" | samtools view -c -)
+echo "Number of aligned reads: $aligned_reads"
+VCF_FILE="path/to/your/variants.vcf"
+bcftools query -c -l "$VCF_FILE" | while read -r sample
+do
+echo "Sample: $sample, Variant Count:"
+echo "$(bcftools query -c -S \"$sample\" \"$VCF_FILE\")"
+done
+Now, perform a 
+# count number of reads in raw and trimmed data
+#for fwd in data/raw_fastq/*.fastq
+#do
+#       gunzip data/raw_fastq/*_1.fastq.gz
+#       sample=$(basename $fwd _1.fastq)
+#       echo ${sample}
+#       echo $(cat data/raw_fastq/${sample}_1.fastq | wc -l)/4 |bc > results/${sampl$#done
+#gunzip data/trimmed_fastq_capstone/*_1.paired.fastq.gz
+#for fwd in data/trimmed_fastq_capstone/*_1.paired.fastq
+#do
+#       sample=$(basename $fwd _1.paired.fastq)
+#       echo ${sample}
+#       echo $(cat data/trimmed_fastq_capstone/${sample}_1.paired.fastq | wc -l)/4 |$#done
+# count how many reads aligned to the genome
+#module load SAMtools/1.18-GCC-12.3.0
+#for reads in results/sam/*.sam
+#do
+#       sample=$(basename $reads .sam)
+#       echo "Calling sample read $sample"
+#       aligned_reads=$(samtools view -c -F 0x4 results/sam/$sample.sam)
+#       echo "Number of aligned reads: $aligned_reads"
+#       echo $aligned_reads > results/${sample}_aligned.csv
+#done
+# count how many variants are from each sample
+for variants in results/vcf/*.vcf
+do
+        sample=$(basename $variants .vcf)
+        #tail -n +29 results/vcf/${sample}.vcf | cat
+        snps="tail -n +29"
+        wc -l  results/vcf/${sample}.vcf | $snps > results/${sample}_variants.csv
+done
+
+
+
+Now run all functional scripts as a batch
+#!/bin/bash
+#SBATCH --partition=batch
+#SBATCH --job-name=test
+#SBATCH --ntasks=1
+#SBATCH --time=2:00:00
+#SBATCH --mem=2gb
+cd /scratch/tbw85611/ecoli_variation1
+#Run pipeline
+bash setup.sh
+bash read_qc_capstone.sh
+bash variant_calling_capstone.sh
+bash summary_stats.sh
+
+Reminder to have a record of what you did each day, which should be kept in a NOTEBOOK.md
+#May 29th 2025
+Rewatched class videos and took notes to prepare for capstone project
+#May 30th 2025
+Rewatched class videos and took notes to prepare for capstone project
+#May 31st 2025
+Rewatched class videos and took notes to prepare for capstone project
+#June 1st 2025
+Attempted to begin capstone coding
+#June 2nd 2025
+Truly began coding in ecoli_variation1 (not ecoli_var or ecoli_var2) for capstone
+Setup folder and fastqc/multiqc codes
+#June 3rd 2025
+Wrote code for trimming ILLUMINA adaptors on full dataset with trimmomatic, and reran FASTQC and MULTIQC on full data
+Did full genome analysis on paired forward- variant calling with sam, bam, vcf
+#June 4th 2025
+Finished scripting-counting reads of raw and trimmed, as well as variants and alignments
+Ran data in R
+#June 5th 2025
+Finished writing code/notes in git and made sure all files were uploaded to the working directory
+#June 6th 2025
+Will submit capstone and hope I don't mess it up!
+
+
+
+#R code:
+#Below is the code for my line and bar graphs in R, which have been uploaded to eLC as a PDF as well
+
+"title: "Capstone_Pipeline"
+author: "Tay Welsh"
+date: "2025-06-04"
+output: html_document
+---
+# Description of capstone project
+The purpose of the BINF8960 capstone project has been to incorporate an array of commands used in both git/command line, the cluster, and R.
+For this project, the entire data set for E. coli variation was used as opposed to a "short" data set.
+Note that this scripting occurred over numerous days, taking multiple hours per day, showing the amount of time that one should dedicate to his/her/their data analysis via scripting so that codes act as expected.
+Here is the link to the Github repo (note that this is ssh):git@github.com:Twelshie/Capstone_BINF8960.git. Seemingly, the repo did not get added to git, but all files used are in the /work/binf8960/tbw85611/Capstone_BINF8960 of the teaching cluster
+
+```{r}
+library(ggplot2)
+library(readr)
+library(plyr)
+## Line graph
+summary_data= read.csv("summary_table_stats.csv")
+ggplot(summary_data) +
+  aes(x=type_of_read, y=number_of_reads, group=sample, color=sample) +
+  geom_point(color="blue") +
+  geom_line()
+## Bar chart
+variant_data= read.csv("variant_stats.csv")
+  ggplot(variant_data, aes(x=sample, y=variant_reads, color= sample)) + 
+  geom_bar(stat = "identity")
+```
+The above graphs display the number of reads for each sample at each step of raw, trimmed, and aligned in the form of a connected line graph, as well as a bar graph for the variants of each sample. One thing to note is that the variants data seemed inconsistant with what was in the output files from the variant processing command.
+We can see that the number of reads trends as having the most reads for alignment, then raw_reads, then the least number of reads for trimmed_reads. This is sensical because the trimmed reads will having a shorter sequence than the raw reads.
+Further, for the bar graph, we see that there are high variant reads for the SRR2584866 sample but much less for the SRR2584863, and even less for the SRR2589044 sample. This is sensical because the SRR2584866 sample contains the greatest number of reads, as discussed in the prior paragraph, while the SRR2589044 sample contains the fewest number of reads. Thus, it makes sense that there would be fewer variants when there are fewer reads."
+
